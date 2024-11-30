@@ -2,7 +2,7 @@
   "name": "flashcards",
   "private": true,
   "version": "1.0.0",
-  "homepage": "https://[your-username].github.io/flashcards",
+  "homepage": "https://attila121.github.io/Adatbazisok2_flash_cards",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
