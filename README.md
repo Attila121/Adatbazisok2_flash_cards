@@ -37,7 +37,7 @@ Az alkalmazás React és TypeScript alapokon nyugszik, sötét témával és mar
 ```bash
 # Projekt klónozása
 git clone [repository-url]
-cd database2-flashcard-app
+cd flashcards
 
 # Függőségek telepítése
 npm install

@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent } from "./components/ui/card";
-import { Button } from "./components/ui/button";
+import { Card, CardContent } from "./components/ui/Card";
+import { Button } from "./components/ui/Button";
 import MarkdownRenderer from "./MarkdownRenderer";
+import FlipCard from "./components/ui/Flippcard";
+import QuestionRangeSelector from "./components/QuestionRangeSelector";
 
 import {
   CheckCircle,
@@ -12,6 +14,9 @@ import {
   Columns,
   List,
   Maximize2,
+  Hash as HashIcon,
+  Bookmark,
+  BookmarkCheck,
 } from "lucide-react";
 
 // Type definitions
@@ -24,6 +29,7 @@ type Flashcard = {
   timesCorrect: number;
   timesIncorrect: number;
   lastReviewed?: Date;
+  isMarked?: boolean; // New property
 };
 
 type Progress = {
@@ -31,7 +37,7 @@ type Progress = {
     [key: number]: Omit<
       Flashcard,
       "id" | "question" | "answer" | "hasImage" | "imagePath"
-    >;
+    > & { isMarked?: boolean };
   };
   lastCardIndex: number;
 };
@@ -46,12 +52,15 @@ export default function FlashcardApp() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [knownCards, setKnownCards] = useState<Flashcard[]>([]);
   const [unknownCards, setUnknownCards] = useState<Flashcard[]>([]);
-  const [studyMode, setStudyMode] = useState<"all" | "unknown">("all");
+  const [studyMode, setStudyMode] = useState<"all" | "unknown" | "marked">("all");
   const [dualView, setDualView] = useState(false);
   const [showQuestionList, setShowQuestionList] = useState(false);
   const currentQuestionRef = useRef<HTMLButtonElement>(null);
   const questionListRef = useRef<HTMLDivElement>(null);
+  const [selectedRange, setSelectedRange] = useState<{start: number; end: number} | null>(null);
+  const [showRangeSelector, setShowRangeSelector] = useState(false);
 
+  
   const loadProgress = (): Progress => {
     try {
       const savedProgress = localStorage.getItem(PROGRESS_KEY);
@@ -86,15 +95,26 @@ export default function FlashcardApp() {
       console.error("Error saving progress:", error);
     }
   };
+  
+  const getFilteredCards = () => {
+    switch (studyMode) {
+      case "marked":
+        return cards.filter(card => card.isMarked);
+      case "unknown":
+        return cards.filter(card => card.timesIncorrect > card.timesCorrect);
+      default:
+        return cards;
+    }
+  };
 
   // Parse markdown and initialize cards
   useEffect(() => {
     const parseMarkdown = (markdown: string): Flashcard[] => {
       if (!markdown) return [];
-  
+
       const questions: Flashcard[] = [];
       const lines = markdown.trim().split("\n");
-  
+
       let currentQuestion = "";
       let currentAnswer = "";
       let currentId = 0;
@@ -104,7 +124,7 @@ export default function FlashcardApp() {
       let currentIndentLevel = 0;
       let inTable = false;
       let tableBuffer = "";
-  
+
       const processCurrentQuestion = () => {
         if (currentQuestion) {
           questions.push({
@@ -118,12 +138,13 @@ export default function FlashcardApp() {
           });
         }
       };
-  
+
+
       const getIndentLevel = (line: string): number => {
         const match = line.match(/^(\s*)/);
-        return match && match[1] ? Math.floor((match[1].length) / 2) : 0;
+        return match && match[1] ? Math.floor(match[1].length / 2) : 0;
       };
-  
+
       const processLine = (line: string) => {
         // Handle code blocks
         if (line.startsWith("```")) {
@@ -131,16 +152,16 @@ export default function FlashcardApp() {
           currentAnswer += line + "\n";
           return;
         }
-  
+
         if (inCodeBlock) {
           currentAnswer += line + "\n";
           return;
         }
-  
+
         // Check for table markers
-        const isTableRow = line.trim().startsWith('|');
+        const isTableRow = line.trim().startsWith("|");
         const isTableDivider = line.trim().match(/^\|-+\|/);
-        
+
         // Handle table start
         if (isTableRow && !inTable) {
           inTable = true;
@@ -149,7 +170,7 @@ export default function FlashcardApp() {
           tableBuffer += indent + line + "\n";
           return;
         }
-        
+
         // Handle table content
         if (inTable) {
           const indent = "  ".repeat(currentIndentLevel);
@@ -164,7 +185,7 @@ export default function FlashcardApp() {
             if (!line.trim()) return; // Skip empty line after table
           }
         }
-  
+
         // Handle image references
         const imageMatch = line.match(/!\[.*?\]\((.*?)\)/);
         if (imageMatch && imageMatch[1]) {
@@ -175,7 +196,7 @@ export default function FlashcardApp() {
           }
           return;
         }
-  
+
         // Handle bullet points
         const bulletMatch = line.match(/^(\s*)[*-]\s(.+)/);
         if (bulletMatch) {
@@ -185,7 +206,7 @@ export default function FlashcardApp() {
           currentAnswer += `${indentStr}- ${content}\n`;
           return;
         }
-  
+
         // Handle continued lines within a bullet point
         if (line.trim() && getIndentLevel(line) >= currentIndentLevel) {
           const indentStr = "  ".repeat(currentIndentLevel);
@@ -193,12 +214,12 @@ export default function FlashcardApp() {
           currentAnswer += `${indentStr}  ${contentWithoutIndent}\n`;
           return;
         }
-  
+
         // Reset indent level for non-indented lines
         if (line.trim() && getIndentLevel(line) === 0) {
           currentIndentLevel = 0;
         }
-  
+
         // Add regular lines
         if (line.trim()) {
           currentAnswer += line + "\n";
@@ -207,13 +228,13 @@ export default function FlashcardApp() {
           currentAnswer += "\n";
         }
       };
-  
+
       for (const line of lines) {
         // Match question headers
         const questionMatch = line.trim().match(/^## (\d+)\.\s(.+)/);
         if (questionMatch) {
           processCurrentQuestion();
-  
+
           const [_, idStr, questionText] = questionMatch;
           currentId = parseInt(idStr || "0", 10);
           currentQuestion = questionText || "";
@@ -225,18 +246,16 @@ export default function FlashcardApp() {
           tableBuffer = "";
           continue;
         }
-  
+
         processLine(line);
       }
-  
+
       // Process the last question
       processCurrentQuestion();
-  
+
       return questions;
     };
-  
-    
-    
+
     const loadFlashcards = async () => {
       try {
         const response = await fetch("kerdesek.md");
@@ -295,10 +314,10 @@ export default function FlashcardApp() {
     setKnownCards([...knownCards, currentCard]);
     setShowAnswer(false);
 
+    // Cycle back to beginning when reaching the end
+    const filteredCards = getFilteredCards();
     const nextIndex =
-      currentCardIndex < cards.length - 1
-        ? currentCardIndex + 1
-        : currentCardIndex;
+      currentCardIndex < filteredCards.length - 1 ? currentCardIndex + 1 : 0;
     setCurrentCardIndex(nextIndex);
     saveProgress(updatedCards, nextIndex);
   };
@@ -318,10 +337,10 @@ export default function FlashcardApp() {
     setUnknownCards([...unknownCards, currentCard]);
     setShowAnswer(false);
 
+    // Cycle back to beginning when reaching the end
+    const filteredCards = getFilteredCards();
     const nextIndex =
-      currentCardIndex < cards.length - 1
-        ? currentCardIndex + 1
-        : currentCardIndex;
+      currentCardIndex < filteredCards.length - 1 ? currentCardIndex + 1 : 0;
     setCurrentCardIndex(nextIndex);
     saveProgress(updatedCards, nextIndex);
   };
@@ -339,30 +358,71 @@ export default function FlashcardApp() {
     saveProgress(cards, index);
   };
 
+  // Update toggleStudyMode function to only handle unknown/all
   const toggleStudyMode = () => {
-    setStudyMode(studyMode === "all" ? "unknown" : "all");
+    setStudyMode(current => current === "all" ? "unknown" : "all");
     setCurrentCardIndex(0);
     setShowAnswer(false);
   };
 
+  // Add new function for marked mode
+  const toggleMarkedMode = () => {
+    setStudyMode(current => current === "marked" ? "all" : "marked");
+    setCurrentCardIndex(0);
+    setShowAnswer(false);
+  };
+
+  const toggleMark = (cardIndex: number) => {
+    const updatedCards = [...cards];
+    updatedCards[cardIndex] = {
+      ...updatedCards[cardIndex],
+      isMarked: !updatedCards[cardIndex].isMarked,
+    };
+    setCards(updatedCards);
+    saveProgress(updatedCards, currentCardIndex);
+  };
+
   useEffect(() => {
-    if (showQuestionList && currentQuestionRef.current && questionListRef.current) {
+    if (
+      showQuestionList &&
+      currentQuestionRef.current &&
+      questionListRef.current
+    ) {
       // Wait for the modal animation to complete
       setTimeout(() => {
         currentQuestionRef.current?.scrollIntoView({
-          behavior: 'auto',
-          block: 'center'
+          behavior: "auto",
+          block: "center",
         });
       }, 100);
     }
   }, [showQuestionList]);
-
 
   const currentCard = cards[currentCardIndex];
 
   if (cards.length === 0) {
     return <div>Loading flashcards...</div>;
   }
+
+  // Add UI elements to render
+  const renderCardControls = () => (
+    <div className="grid grid-cols-3 gap-4 mb-6">
+      <Button onClick={handleUnknown} variant="destructive">
+        <XCircle className="mr-2" /> Don't Know
+      </Button>
+      <Button
+        onClick={() => toggleMark(currentCardIndex)}
+        variant="outline"
+        className={currentCard?.isMarked ? "border-yellow-500" : ""}
+      >
+        {currentCard?.isMarked ? <BookmarkCheck /> : <Bookmark />}
+        {currentCard?.isMarked ? "Marked" : "Mark"}
+      </Button>
+      <Button onClick={handleKnown}>
+        <CheckCircle className="mr-2" /> Know It  
+      </Button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
@@ -404,14 +464,46 @@ export default function FlashcardApp() {
             <Button
               variant="outline"
               size="sm"
+              className={`border-gray-700 hover:bg-gray-800 ${
+                studyMode === "marked" ? "bg-yellow-500/20 text-yellow-500" : ""
+              }`}
+              onClick={toggleMarkedMode}
+            >
+              <BookmarkCheck className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               className="border-gray-700 hover:bg-gray-800"
               onClick={handleReset}
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-gray-700 hover:bg-gray-800"
+              onClick={() => setShowRangeSelector(true)}
+            >
+              <HashIcon className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-{showQuestionList && (
+
+        {/* Add Range Selector */}
+        {showRangeSelector && (
+          <QuestionRangeSelector 
+            totalQuestions={cards.length} 
+            onSelectRange={(start, end) => {
+              setSelectedRange({ start, end });
+              setCurrentCardIndex(0);
+              setShowAnswer(false);
+            }}
+            onClose={() => setShowRangeSelector(false)}
+          />
+        )}
+
+        {showQuestionList && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-gray-800 rounded-lg max-w-4xl w-full h-[80vh] flex flex-col">
               <div className="p-4 border-b border-gray-700 flex justify-between items-center">
@@ -430,7 +522,9 @@ export default function FlashcardApp() {
                   {cards.map((card, index) => (
                     <Button
                       key={card.id}
-                      ref={index === currentCardIndex ? currentQuestionRef : null}
+                      ref={
+                        index === currentCardIndex ? currentQuestionRef : null
+                      }
                       variant="outline"
                       className={`w-full justify-start ${
                         index === currentCardIndex
@@ -453,7 +547,7 @@ export default function FlashcardApp() {
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2 text-sm text-gray-400">
             <span>
-              Question {currentCardIndex + 1} of {cards.length}
+              Question {currentCardIndex + 1} of {getFilteredCards().length}
             </span>
             {currentCard?.hasImage && (
               <span className="flex items-center">
@@ -466,7 +560,7 @@ export default function FlashcardApp() {
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-300"
               style={{
-                width: `${((currentCardIndex + 1) / cards.length) * 100}%`,
+                width: `${((currentCardIndex + 1) / getFilteredCards().length) * 100}%`,
               }}
             />
           </div>
@@ -476,91 +570,61 @@ export default function FlashcardApp() {
         {dualView ? (
           <div className="grid grid-cols-2 gap-8 mb-4">
             {/* First card - Question */}
-            <Card className="mb-4 bg-gray-800 border-gray-700">
+            <Card className="bg-gray-800 border-gray-700 hover:border-gray-600 transition-colors">
               <CardContent className="p-6">
-                <div className="min-h-[500px]">
+                <div className="min-h-[500px] flex flex-col">
                   <div className="mb-4 text-sm font-medium text-gray-400">
                     Question:
                   </div>
-                  <div className="text-xl leading-relaxed space-y-1">
-                    <MarkdownRenderer
-                      content={currentCard?.question}
-                      imagePath={undefined}
-                    />
+                  <div className="flex-grow">
+                    <div className="text-xl leading-relaxed">
+                      <MarkdownRenderer
+                        content={currentCard?.question}
+                        imagePath={undefined}
+                      />
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
             {/* Second card - Answer */}
-            <Card className="mb-4 bg-gray-800 border-gray-700">
+            <Card className="bg-gray-800 border-gray-700 hover:border-gray-600 transition-colors">
               <CardContent className="p-6">
-                <div className="min-h-[500px]">
+                <div className="min-h-[500px] flex flex-col">
                   <div className="mb-4 text-sm font-medium text-gray-400">
                     Answer:
                   </div>
-                  <div className="text-xl leading-relaxed space-y-1">
-                    <MarkdownRenderer
-                      content={currentCard?.answer}
-                      imagePath={currentCard?.imagePath}
-                    />
+                  <div className="flex-grow">
+                    <div className="text-xl leading-relaxed">
+                      <MarkdownRenderer
+                        content={currentCard?.answer}
+                        imagePath={currentCard?.imagePath}
+                      />
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
         ) : (
-          // Single view card
-          <Card className="mb-4 bg-gray-800 border-gray-700">
-            <CardContent className="p-6">
-              <div className="min-h-[500px] flex flex-col">
-                <div className="mb-4 text-sm font-medium text-gray-400">
-                  {showAnswer ? "Answer:" : "Question:"}
-                </div>
-                <div className="flex-grow">
-                  <div className="text-xl leading-relaxed">
-                    <MarkdownRenderer
-                      content={
-                        showAnswer ? currentCard?.answer : currentCard?.question
-                      }
-                      imagePath={
-                        showAnswer ? currentCard?.imagePath : undefined
-                      }
-                    />
-                  </div>
-                </div>
-                <Button
-                  onClick={() => setShowAnswer(!showAnswer)}
-                  className="w-full mt-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:opacity-90"
-                  size="lg"
-                >
-                  {showAnswer ? "Show Question" : "Show Answer"}
-                  <ChevronRight className="ml-2" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <FlipCard
+            question={currentCard?.question}
+            answer={currentCard?.answer}
+            imagePath={currentCard?.imagePath}
+            onKnow={handleKnown}
+            onDontKnow={handleUnknown}
+            showAnswer={showAnswer}
+            setShowAnswer={setShowAnswer}
+            currentIndex={currentCardIndex}
+            totalCards={cards.length}
+          />
         )}
         {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-8 mb-6">
-          <Button
-            onClick={handleUnknown}
-            variant="destructive"
-            size="lg"
-            className="flex items-center justify-center bg-red-500/20 hover:bg-red-500/30"
-          >
-            <XCircle className="mr-2" /> Don't Know
-          </Button>
-          <Button
-            onClick={handleKnown}
-            size="lg"
-            className="flex items-center justify-center bg-green-500/20 hover:bg-green-500/30"
-          >
-            <CheckCircle className="mr-2" /> Know It
-          </Button>
-        </div>
+        {renderCardControls()}
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-8 mb-4">
+        <div className="grid grid-cols-3 gap-8 mb-4">
           <div className="p-3 bg-gray-800 rounded-lg">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-400">Known</span>
@@ -574,6 +638,14 @@ export default function FlashcardApp() {
               <span className="text-sm text-gray-400">Need Practice</span>
               <span className="text-xl font-bold text-red-400">
                 {unknownCards.length}
+              </span>
+            </div>
+          </div>
+          <div className="p-3 bg-gray-800 rounded-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-400">Marked</span>
+              <span className="text-xl font-bold text-yellow-400">
+                {cards.filter(card => card.isMarked).length}
               </span>
             </div>
           </div>
