@@ -9,7 +9,6 @@ import {
   CheckCircle,
   XCircle,
   RotateCcw,
-  ChevronRight,
   Image as ImageIcon,
   Columns,
   List,
@@ -52,15 +51,21 @@ export default function FlashcardApp() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [knownCards, setKnownCards] = useState<Flashcard[]>([]);
   const [unknownCards, setUnknownCards] = useState<Flashcard[]>([]);
-  const [studyMode, setStudyMode] = useState<"all" | "unknown" | "marked">("all");
+  const [studyMode, setStudyMode] = useState<"all" | "unknown" | "marked">(
+    "all"
+  );
   const [dualView, setDualView] = useState(false);
   const [showQuestionList, setShowQuestionList] = useState(false);
   const currentQuestionRef = useRef<HTMLButtonElement>(null);
   const questionListRef = useRef<HTMLDivElement>(null);
-  const [selectedRange, setSelectedRange] = useState<{start: number; end: number} | null>(null);
+  const [selectedRange, setSelectedRange] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
   const [showRangeSelector, setShowRangeSelector] = useState(false);
+  const [filteredCards, setFilteredCards] = useState<Flashcard[]>([]);
+  const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
 
-  
   const loadProgress = (): Progress => {
     try {
       const savedProgress = localStorage.getItem(PROGRESS_KEY);
@@ -95,15 +100,27 @@ export default function FlashcardApp() {
       console.error("Error saving progress:", error);
     }
   };
-  
+
   const getFilteredCards = () => {
+    let filteredCards = [...cards];
+
+    // First apply range filter if selected
+    if (selectedRange) {
+      filteredCards = filteredCards.filter(
+        (card) => card.id >= selectedRange.start && card.id <= selectedRange.end
+      );
+    }
+
+    // Then apply study mode filter
     switch (studyMode) {
       case "marked":
-        return cards.filter(card => card.isMarked);
+        return filteredCards.filter((card) => card.isMarked);
       case "unknown":
-        return cards.filter(card => card.timesIncorrect > card.timesCorrect);
+        return filteredCards.filter(
+          (card) => card.timesIncorrect > card.timesCorrect
+        );
       default:
-        return cards;
+        return filteredCards;
     }
   };
 
@@ -138,7 +155,6 @@ export default function FlashcardApp() {
           });
         }
       };
-
 
       const getIndentLevel = (line: string): number => {
         const match = line.match(/^(\s*)/);
@@ -314,12 +330,19 @@ export default function FlashcardApp() {
     setKnownCards([...knownCards, currentCard]);
     setShowAnswer(false);
 
-    // Cycle back to beginning when reaching the end
-    const filteredCards = getFilteredCards();
-    const nextIndex =
-      currentCardIndex < filteredCards.length - 1 ? currentCardIndex + 1 : 0;
-    setCurrentCardIndex(nextIndex);
-    saveProgress(updatedCards, nextIndex);
+    // Get next card from filtered set
+    const nextFilteredIndex =
+      currentFilteredIndex < filteredCards.length - 1
+        ? currentFilteredIndex + 1
+        : 0;
+    const nextCard = filteredCards[nextFilteredIndex];
+
+    // Find the actual index in the full cards array
+    if (nextCard) {
+      const nextIndex = cards.findIndex((card) => card.id === nextCard.id);
+      setCurrentCardIndex(nextIndex);
+      saveProgress(updatedCards, nextIndex);
+    }
   };
 
   const handleUnknown = () => {
@@ -337,12 +360,30 @@ export default function FlashcardApp() {
     setUnknownCards([...unknownCards, currentCard]);
     setShowAnswer(false);
 
-    // Cycle back to beginning when reaching the end
-    const filteredCards = getFilteredCards();
-    const nextIndex =
-      currentCardIndex < filteredCards.length - 1 ? currentCardIndex + 1 : 0;
-    setCurrentCardIndex(nextIndex);
-    saveProgress(updatedCards, nextIndex);
+    // Get next card from filtered set
+    const nextFilteredIndex =
+      currentFilteredIndex < filteredCards.length - 1
+        ? currentFilteredIndex + 1
+        : 0;
+    const nextCard = filteredCards[nextFilteredIndex];
+
+    // Find the actual index in the full cards array
+    if (nextCard) {
+      const nextIndex = cards.findIndex((card) => card.id === nextCard.id);
+      setCurrentCardIndex(nextIndex);
+      saveProgress(updatedCards, nextIndex);
+    }
+  };
+
+  const handleCardSelect = (index: number) => {
+    const selectedCard = filteredCards[index];
+    if (!selectedCard) return;
+
+    const newIndex = cards.findIndex((card) => card.id === selectedCard.id);
+    setCurrentCardIndex(newIndex);
+    setShowQuestionList(false);
+    setShowAnswer(false);
+    saveProgress(cards, newIndex);
   };
 
   const handleReset = () => {
@@ -351,35 +392,31 @@ export default function FlashcardApp() {
     window.location.reload();
   };
 
-  const handleCardSelect = (index: number) => {
-    setCurrentCardIndex(index);
-    setShowQuestionList(false);
-    setShowAnswer(false);
-    saveProgress(cards, index);
-  };
-
   // Update toggleStudyMode function to only handle unknown/all
   const toggleStudyMode = () => {
-    setStudyMode(current => current === "all" ? "unknown" : "all");
+    setStudyMode((current) => (current === "all" ? "unknown" : "all"));
     setCurrentCardIndex(0);
     setShowAnswer(false);
   };
 
   // Add new function for marked mode
   const toggleMarkedMode = () => {
-    setStudyMode(current => current === "marked" ? "all" : "marked");
+    setStudyMode((current) => (current === "marked" ? "all" : "marked"));
     setCurrentCardIndex(0);
     setShowAnswer(false);
   };
 
   const toggleMark = (cardIndex: number) => {
     const updatedCards = [...cards];
-    updatedCards[cardIndex] = {
-      ...updatedCards[cardIndex],
-      isMarked: !updatedCards[cardIndex].isMarked,
-    };
-    setCards(updatedCards);
-    saveProgress(updatedCards, currentCardIndex);
+    const cardToUpdate = updatedCards[cardIndex];
+    if (cardToUpdate) {
+      updatedCards[cardIndex] = {
+        ...cardToUpdate,
+        isMarked: !cardToUpdate.isMarked,
+      };
+      setCards(updatedCards);
+      saveProgress(updatedCards, currentCardIndex);
+    }
   };
 
   useEffect(() => {
@@ -397,6 +434,15 @@ export default function FlashcardApp() {
       }, 100);
     }
   }, [showQuestionList]);
+
+  useEffect(() => {
+    const filtered = getFilteredCards();
+    setFilteredCards(filtered);
+    const newFilteredIndex = filtered.findIndex(
+      (card) => card.id === cards[currentCardIndex]?.id
+    );
+    setCurrentFilteredIndex(newFilteredIndex >= 0 ? newFilteredIndex : 0);
+  }, [cards, selectedRange, studyMode, currentCardIndex]);
 
   const currentCard = cards[currentCardIndex];
 
@@ -419,7 +465,7 @@ export default function FlashcardApp() {
         {currentCard?.isMarked ? "Marked" : "Mark"}
       </Button>
       <Button onClick={handleKnown}>
-        <CheckCircle className="mr-2" /> Know It  
+        <CheckCircle className="mr-2" /> Know It
       </Button>
     </div>
   );
@@ -492,11 +538,18 @@ export default function FlashcardApp() {
 
         {/* Add Range Selector */}
         {showRangeSelector && (
-          <QuestionRangeSelector 
-            totalQuestions={cards.length} 
+          <QuestionRangeSelector
+            totalQuestions={cards.length}
             onSelectRange={(start, end) => {
               setSelectedRange({ start, end });
-              setCurrentCardIndex(0);
+              // Find the first card in the new range and set it as current
+              const firstCardInRange = cards.find((card) => card.id === start);
+              if (firstCardInRange) {
+                const startIndex = cards.findIndex(
+                  (card) => card.id === firstCardInRange.id
+                );
+                setCurrentCardIndex(startIndex);
+              }
               setShowAnswer(false);
             }}
             onClose={() => setShowRangeSelector(false)}
@@ -519,15 +572,17 @@ export default function FlashcardApp() {
 
               <div className="flex-1 overflow-y-auto p-4" ref={questionListRef}>
                 <div className="space-y-2">
-                  {cards.map((card, index) => (
+                  {filteredCards.map((card, index) => (
                     <Button
                       key={card.id}
                       ref={
-                        index === currentCardIndex ? currentQuestionRef : null
+                        index === currentFilteredIndex
+                          ? currentQuestionRef
+                          : null
                       }
                       variant="outline"
                       className={`w-full justify-start ${
-                        index === currentCardIndex
+                        index === currentFilteredIndex
                           ? "border-blue-500 bg-blue-500/10"
                           : "border-gray-700"
                       }`}
@@ -547,7 +602,12 @@ export default function FlashcardApp() {
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2 text-sm text-gray-400">
             <span>
-              Question {currentCardIndex + 1} of {getFilteredCards().length}
+              Question {currentFilteredIndex + 1} of {filteredCards.length}
+              {selectedRange && (
+                <span className="ml-2 text-gray-500">
+                  (Range: {selectedRange.start}-{selectedRange.end})
+                </span>
+              )}
             </span>
             {currentCard?.hasImage && (
               <span className="flex items-center">
@@ -560,7 +620,9 @@ export default function FlashcardApp() {
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-300"
               style={{
-                width: `${((currentCardIndex + 1) / getFilteredCards().length) * 100}%`,
+                width: `${
+                  ((currentFilteredIndex + 1) / filteredCards.length) * 100
+                }%`,
               }}
             />
           </div>
@@ -617,7 +679,6 @@ export default function FlashcardApp() {
             showAnswer={showAnswer}
             setShowAnswer={setShowAnswer}
             currentIndex={currentCardIndex}
-            totalCards={cards.length}
           />
         )}
         {/* Action Buttons */}
@@ -645,7 +706,7 @@ export default function FlashcardApp() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-400">Marked</span>
               <span className="text-xl font-bold text-yellow-400">
-                {cards.filter(card => card.isMarked).length}
+                {cards.filter((card) => card.isMarked).length}
               </span>
             </div>
           </div>

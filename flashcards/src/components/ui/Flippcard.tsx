@@ -2,9 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { motion, useAnimation, useMotionValue, useTransform } from 'framer-motion';
 import { Card, CardContent } from './Card';
 import MarkdownRenderer from '../../MarkdownRenderer';
-import { ArrowLeftRight } from 'lucide-react';
 
-const FlipCard = ({ 
+interface FlipCardProps {
+  question: string | undefined;
+  answer: string | undefined;
+  imagePath?: string;
+  onKnow: () => void;
+  onDontKnow: () => void;
+  showAnswer: boolean;
+  setShowAnswer: (show: boolean) => void;
+  currentIndex: number;
+}
+
+const FlipCard: React.FC<FlipCardProps> = ({ 
   question, 
   answer, 
   imagePath, 
@@ -12,8 +22,7 @@ const FlipCard = ({
   onDontKnow,
   showAnswer,
   setShowAnswer,
-  currentIndex,
-  totalCards
+  currentIndex
 }) => {
   const controls = useAnimation();
   const x = useMotionValue(0);
@@ -30,7 +39,7 @@ const FlipCard = ({
     setIsDragging(true);
   };
 
-  const handleDragEnd = async (event, info) => {
+  const handleDragEnd = async (_event: MouseEvent | TouchEvent | PointerEvent, info: { offset: { x: number } }) => {
     setIsDragging(false);
     const { offset } = info;
     

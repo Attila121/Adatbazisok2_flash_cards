@@ -1,15 +1,25 @@
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Button } from './ui/Button';
 import { HashIcon } from 'lucide-react';
 
-const QuestionRangeSelector = ({ totalQuestions, onSelectRange, onClose }) => {
+interface QuestionRangeSelectorProps {
+  totalQuestions: number;
+  onSelectRange: (start: number, end: number) => void;
+  onClose: () => void;
+}
+
+const QuestionRangeSelector: React.FC<QuestionRangeSelectorProps> = ({ 
+  totalQuestions, 
+  onSelectRange, 
+  onClose 
+}) => {
   const ranges = [];
   for (let i = 0; i < totalQuestions; i += 10) {
-    ranges.push({
-      start: i + 1,
-      end: Math.min(i + 10, totalQuestions)
-    });
+    const start = i + 1;
+    const end = Math.min(i + 10, totalQuestions);
+    // Only add valid ranges
+    if (start <= totalQuestions) {
+      ranges.push({ start, end });
+    }
   }
 
   return (
