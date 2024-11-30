@@ -9,20 +9,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,md}'],
-        runtimeCaching: [
-          {
-            urlPattern: /\.md$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'markdown-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
-              }
-            }
-          }
-        ]
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,md}']
       },
       manifest: {
         name: 'Flashcard Study App',
