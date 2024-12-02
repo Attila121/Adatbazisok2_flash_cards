@@ -5,7 +5,7 @@
   "homepage": "https://attila121.github.io/Adatbazisok2_flash_cards/",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && node scripts/fix-paths.js",
     "preview": "vite preview",
     "clean": "rm -rf dist && rm -rf node_modules/.vite",
     "predeploy": "npm run clean && npm run build",
