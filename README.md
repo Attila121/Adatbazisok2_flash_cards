@@ -3,7 +3,7 @@ Modern, interaktív tanulókártya alkalmazás az Adatbázisok 2 vizsgakérdése
 Az alkalmazás React és TypeScript alapokon nyugszik, sötét témával és markdown támogatással.
 ### Telepítés nélkül github PWA
 
-Elérhető `https://attila121.github.io/Adatbazisok2_flash_cards/`
+Elérhető https://attila121.github.io/Adatbazisok2_flash_cards/
 
 ### Telepítési lépések
 
