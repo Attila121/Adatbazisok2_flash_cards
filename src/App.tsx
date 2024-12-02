@@ -4,6 +4,7 @@ import { Button } from "./components/ui/Button";
 import MarkdownRenderer from "./MarkdownRenderer";
 import FlipCard from "./components/ui/Flippcard";
 import QuestionRangeSelector from "./components/QuestionRangeSelector";
+import MobileMenu from "./components/ui/MobileMenu";
 
 import {
   CheckCircle,
@@ -16,9 +17,10 @@ import {
   Hash as HashIcon,
   Bookmark,
   BookmarkCheck,
+  Menu,
 } from "lucide-react";
 
-// Type definitions
+
 type Flashcard = {
   id: number;
   question: string;
@@ -65,6 +67,7 @@ export default function FlashcardApp() {
   const [showRangeSelector, setShowRangeSelector] = useState(false);
   const [filteredCards, setFilteredCards] = useState<Flashcard[]>([]);
   const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const loadProgress = (): Progress => {
     try {
@@ -474,11 +477,23 @@ export default function FlashcardApp() {
     <div className="min-h-screen bg-gray-900 text-gray-100">
       <div className="container mx-auto px-4 pt-8 max-w-6xl">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
             Adatbázisok 2 vizsga kérdések
           </h1>
-          <div className="flex gap-2">
+          
+          {/* Mobile menu button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="sm:hidden border-gray-700 hover:bg-gray-800"
+            onClick={() => setIsMobileMenuOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+
+          {/* Desktop controls */}
+          <div className="hidden sm:flex gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -535,6 +550,20 @@ export default function FlashcardApp() {
             </Button>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        <MobileMenu
+          studyMode={studyMode}
+          dualView={dualView}
+          isOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
+          onToggleQuestionList={() => setShowQuestionList(!showQuestionList)}
+          onToggleDualView={() => setDualView(!dualView)}
+          onToggleStudyMode={toggleStudyMode}
+          onToggleMarkedMode={toggleMarkedMode}
+          onReset={handleReset}
+          onToggleRangeSelector={() => setShowRangeSelector(true)}
+        />
 
         {/* Add Range Selector */}
         {showRangeSelector && (
