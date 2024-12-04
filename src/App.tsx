@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "./components/ui/Card";
 import { Button } from "./components/ui/Button";
-import { config } from './config';
+import { config } from "./config";
 import MarkdownRenderer from "./MarkdownRenderer";
 import FlipCard from "./components/ui/Flippcard";
 import QuestionRangeSelector from "./components/QuestionRangeSelector";
 import MobileMenu from "./components/ui/MobileMenu";
-import ExamSetup from './components/ExamSetup';
-import ExamResults from './components/ExamResults';
-import { GraduationCap } from 'lucide-react';
+import ExamSetup from "./components/ExamSetup";
+import ExamResults from "./components/ExamResults";
+import { GraduationCap } from "lucide-react";
 
 import {
   CheckCircle,
@@ -23,7 +23,6 @@ import {
   BookmarkCheck,
   Menu,
 } from "lucide-react";
-
 
 // Type definitions
 type Flashcard = {
@@ -74,11 +73,13 @@ export default function FlashcardApp() {
   const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showExamSetup, setShowExamSetup] = useState(false);
-const [showExamResults, setShowExamResults] = useState(false);
-const [isExamMode, setIsExamMode] = useState(false);
-const [examCards, setExamCards] = useState<Flashcard[]>([]);
-const [examCorrect, setExamCorrect] = useState(0);
-const [examIncorrect, setExamIncorrect] = useState(0);
+  const [showExamResults, setShowExamResults] = useState(false);
+  const [isExamMode, setIsExamMode] = useState(false);
+  const [examCards, setExamCards] = useState<Flashcard[]>([]);
+  const [examCorrect, setExamCorrect] = useState(0);
+  const [examIncorrect, setExamIncorrect] = useState(0);
+  const [randomOrderCards, setRandomOrderCards] = useState<Flashcard[]>([]);
+  const [isRandomOrder, setIsRandomOrder] = useState(false);
 
   const loadProgress = (): Progress => {
     try {
@@ -117,14 +118,19 @@ const [examIncorrect, setExamIncorrect] = useState(0);
 
   const getFilteredCards = () => {
     let filteredCards = [...cards];
-
+  
     // First apply range filter if selected
     if (selectedRange) {
       filteredCards = filteredCards.filter(
         (card) => card.id >= selectedRange.start && card.id <= selectedRange.end
       );
+  
+      // If in random order mode, use the randomized array
+      if (isRandomOrder && randomOrderCards.length > 0) {
+        return randomOrderCards;
+      }
     }
-
+  
     // Then apply study mode filter
     switch (studyMode) {
       case "marked":
@@ -220,7 +226,10 @@ const [examIncorrect, setExamIncorrect] = useState(0);
         const imageMatch = line.match(/!\[.*?\]\((.*?)\)/);
         if (imageMatch && imageMatch[1]) {
           hasImage = true;
-          currentImagePath = imageMatch[1].replace("./images/", `${config.baseUrl}/images/`);
+          currentImagePath = imageMatch[1].replace(
+            "./images/",
+            `${config.baseUrl}/images/`
+          );
           if (currentAnswer.trim() === "") {
             // currentAnswer = "See diagram above";
           }
@@ -330,12 +339,14 @@ const [examIncorrect, setExamIncorrect] = useState(0);
   }, []);
 
   const handleKnown = () => {
-    const currentCard = isExamMode ? examCards[currentCardIndex] : cards[currentCardIndex];
+    const currentCard = isExamMode
+      ? examCards[currentCardIndex]
+      : cards[currentCardIndex];
     if (!currentCard) return;
     if (isExamMode) {
-      setExamCorrect(prev => prev + 1);
+      setExamCorrect((prev) => prev + 1);
       if (currentCardIndex < examCards.length - 1) {
-        setCurrentCardIndex(prev => prev + 1);
+        setCurrentCardIndex((prev) => prev + 1);
         setShowAnswer(false);
       } else {
         // Show results
@@ -343,42 +354,57 @@ const [examIncorrect, setExamIncorrect] = useState(0);
         setIsExamMode(false);
       }
     } else {
-
-
-    const updatedCards = [...cards];
-    updatedCards[currentCardIndex] = {
-      ...currentCard,
-      timesCorrect: currentCard.timesCorrect + 1,
-      lastReviewed: new Date(),
-    };
-
-    setCards(updatedCards);
-    setKnownCards([...knownCards, currentCard]);
-    setShowAnswer(false);
-
-    // Get next card from filtered set
-    const nextFilteredIndex =
-      currentFilteredIndex < filteredCards.length - 1
-        ? currentFilteredIndex + 1
-        : 0;
-    const nextCard = filteredCards[nextFilteredIndex];
-
-    // Find the actual index in the full cards array
-    if (nextCard) {
-      const nextIndex = cards.findIndex((card) => card.id === nextCard.id);
-      setCurrentCardIndex(nextIndex);
-      saveProgress(updatedCards, nextIndex);
+      const currentCard = cards[currentCardIndex];
+      if (!currentCard) return;
+  
+      const updatedCards = [...cards];
+      updatedCards[currentCardIndex] = {
+        ...currentCard,
+        timesCorrect: currentCard.timesCorrect + 1,
+        lastReviewed: new Date(),
+      };
+  
+      setCards(updatedCards);
+      setKnownCards([...knownCards, currentCard]);
+      setShowAnswer(false);
+  
+      const nextFilteredIndex =
+        currentFilteredIndex < filteredCards.length - 1
+          ? currentFilteredIndex + 1
+          : 0;
+  
+      // If we're at the end and using random order, reshuffle
+      if (nextFilteredIndex === 0 && isRandomOrder && selectedRange) {
+        const cardsInRange = cards.filter(
+          (card) => card.id >= selectedRange.start && card.id <= selectedRange.end
+        );
+        const newShuffled = [...cardsInRange].sort(() => Math.random() - 0.5);
+        setRandomOrderCards(newShuffled);
+        const nextIndex = cards.findIndex(
+          (card) => newShuffled[0] && card.id === newShuffled[0].id
+        );
+        setCurrentCardIndex(nextIndex);
+      } else {
+        const nextCard = filteredCards[nextFilteredIndex];
+        if (nextCard) {
+          const nextIndex = cards.findIndex((card) => card.id === nextCard.id);
+          setCurrentCardIndex(nextIndex);
+        }
+      }
+      
+      saveProgress(updatedCards, currentCardIndex);
     }
-  }
   };
 
   const handleUnknown = () => {
-    const currentCard = isExamMode ? examCards[currentCardIndex] : cards[currentCardIndex];
+    const currentCard = isExamMode
+      ? examCards[currentCardIndex]
+      : cards[currentCardIndex];
     if (!currentCard) return;
     if (isExamMode) {
-      setExamIncorrect(prev => prev + 1);
+      setExamIncorrect((prev) => prev + 1);
       if (currentCardIndex < examCards.length - 1) {
-        setCurrentCardIndex(prev => prev + 1);
+        setCurrentCardIndex((prev) => prev + 1);
         setShowAnswer(false);
       } else {
         // Show results
@@ -386,34 +412,47 @@ const [examIncorrect, setExamIncorrect] = useState(0);
         setIsExamMode(false);
       }
     } else {
-
-
-    const updatedCards = [...cards];
-    updatedCards[currentCardIndex] = {
-      ...currentCard,
-      timesIncorrect: currentCard.timesIncorrect + 1,
-      lastReviewed: new Date(),
-    };
-
-    setCards(updatedCards);
-    setUnknownCards([...unknownCards, currentCard]);
-    setShowAnswer(false);
-
-    // Get next card from filtered set
-    const nextFilteredIndex =
-      currentFilteredIndex < filteredCards.length - 1
-        ? currentFilteredIndex + 1
-        : 0;
-    const nextCard = filteredCards[nextFilteredIndex];
-
-    // Find the actual index in the full cards array
-    if (nextCard) {
-      const nextIndex = cards.findIndex((card) => card.id === nextCard.id);
-      setCurrentCardIndex(nextIndex);
-      saveProgress(updatedCards, nextIndex);
+      const currentCard = cards[currentCardIndex];
+      if (!currentCard) return;
+   
+      const updatedCards = [...cards];
+      updatedCards[currentCardIndex] = {
+        ...currentCard,
+        timesIncorrect: currentCard.timesIncorrect + 1,
+        lastReviewed: new Date(),
+      };
+   
+      setCards(updatedCards);
+      setUnknownCards([...unknownCards, currentCard]);
+      setShowAnswer(false);
+   
+      const nextFilteredIndex =
+        currentFilteredIndex < filteredCards.length - 1
+          ? currentFilteredIndex + 1
+          : 0;
+   
+      // If at end and using random order, reshuffle
+      if (nextFilteredIndex === 0 && isRandomOrder && selectedRange) {
+        const cardsInRange = cards.filter(
+          (card) => card.id >= selectedRange.start && card.id <= selectedRange.end
+        );
+        const newShuffled = [...cardsInRange].sort(() => Math.random() - 0.5);
+        setRandomOrderCards(newShuffled);
+        const nextIndex = cards.findIndex(
+          (card) => newShuffled[0] && card.id === newShuffled[0].id
+        );
+        setCurrentCardIndex(nextIndex);
+      } else {
+        const nextCard = filteredCards[nextFilteredIndex];
+        if (nextCard) {
+          const nextIndex = cards.findIndex((card) => card.id === nextCard.id);
+          setCurrentCardIndex(nextIndex);
+        }
+      }
+      
+      saveProgress(updatedCards, currentCardIndex);
     }
-  }
-  };
+   };
 
   const handleCardSelect = (index: number) => {
     const selectedCard = filteredCards[index];
@@ -432,16 +471,20 @@ const [examIncorrect, setExamIncorrect] = useState(0);
     window.location.reload();
   };
 
-  const handleStartExam = (questionCount: number, startRange: number, endRange: number) => {
+  const handleStartExam = (
+    questionCount: number,
+    startRange: number,
+    endRange: number
+  ) => {
     // Filter cards within the range
     const availableCards = cards.filter(
-      card => card.id >= startRange && card.id <= endRange
+      (card) => card.id >= startRange && card.id <= endRange
     );
-    
+
     // Randomly select cards from the filtered range
     const shuffled = [...availableCards].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, questionCount);
-    
+
     setExamCards(selected);
     setExamCorrect(0);
     setExamIncorrect(0);
@@ -495,19 +538,28 @@ const [examIncorrect, setExamIncorrect] = useState(0);
 
   useEffect(() => {
     if (!isExamMode) {
-        const filtered = getFilteredCards();
-        setFilteredCards(filtered);
-        const newFilteredIndex = filtered.findIndex(
-            (card) => card.id === cards[currentCardIndex]?.id
-        );
-        setCurrentFilteredIndex(newFilteredIndex >= 0 ? newFilteredIndex : 0);
+      const filtered = getFilteredCards();
+      setFilteredCards(filtered);
+      const newFilteredIndex = filtered.findIndex(
+        (card) => card.id === cards[currentCardIndex]?.id
+      );
+      setCurrentFilteredIndex(newFilteredIndex >= 0 ? newFilteredIndex : 0);
     } else {
-        setFilteredCards(examCards);
-        setCurrentFilteredIndex(currentCardIndex);
+      setFilteredCards(examCards);
+      setCurrentFilteredIndex(currentCardIndex);
     }
-  }, [cards, selectedRange, studyMode, currentCardIndex, isExamMode, examCards]);
+  }, [
+    cards,
+    selectedRange,
+    studyMode,
+    currentCardIndex,
+    isExamMode,
+    examCards,
+  ]);
 
-  const currentCard = isExamMode ? examCards[currentCardIndex] : cards[currentCardIndex];
+  const currentCard = isExamMode
+    ? examCards[currentCardIndex]
+    : cards[currentCardIndex];
 
   if (cards.length === 0) {
     return <div>Loading flashcards...</div>;
@@ -541,7 +593,7 @@ const [examIncorrect, setExamIncorrect] = useState(0);
           <h1 className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
             Adatbázisok 2 vizsga kérdések
           </h1>
-          
+
           {/* Mobile menu button */}
           <Button
             variant="outline"
@@ -635,31 +687,39 @@ const [examIncorrect, setExamIncorrect] = useState(0);
 
         {/* Add Range Selector */}
         {showRangeSelector && (
-          <QuestionRangeSelector
-          totalQuestions={cards.length}
-          onSelectRange={(start, end, randomOrder) => {
-            setSelectedRange({ start, end });
-            // Find cards in the range
-            const cardsInRange = cards.filter(
-              (card) => card.id >= start && card.id <= end
-            );
-            
-            // Apply random order if selected
-            const orderedCards = randomOrder 
-              ? [...cardsInRange].sort(() => Math.random() - 0.5)
-              : cardsInRange;
-            
-            // Find the first card in the new range and set it as current
-            if (orderedCards.length > 0) {
-              const startIndex = cards.findIndex(
-                (card) => orderedCards[0] && card.id === orderedCards[0].id
-              );
-              setCurrentCardIndex(startIndex);
-            }
-            setShowAnswer(false);
-          }}
-          onClose={() => setShowRangeSelector(false)}
-        />
+         <QuestionRangeSelector
+         totalQuestions={cards.length}
+         onSelectRange={(start, end, randomOrder) => {
+           setSelectedRange({ start, end });
+           setIsRandomOrder(randomOrder);
+           
+           // Find cards in the range
+           const cardsInRange = cards.filter(
+             (card) => card.id >= start && card.id <= end
+           );
+           
+           // If random order, create a shuffled array
+           if (randomOrder) {
+             const shuffled = [...cardsInRange].sort(() => Math.random() - 0.5);
+             setRandomOrderCards(shuffled);
+             // Start from the beginning of the shuffled array
+             const startIndex = cards.findIndex(
+               (card) => shuffled[0] && card.id === shuffled[0].id
+             );
+             setCurrentCardIndex(startIndex);
+           } else {
+             setRandomOrderCards([]);
+             // Start from the first card in sequential order
+             const startIndex = cards.findIndex(
+               (card) => cardsInRange[0] && card.id === cardsInRange[0].id
+             );
+             setCurrentCardIndex(startIndex);
+           }
+           setShowAnswer(false);
+         }}
+         onClose={() => setShowRangeSelector(false)}
+       />
+       
         )}
 
         {showQuestionList && (
@@ -708,19 +768,18 @@ const [examIncorrect, setExamIncorrect] = useState(0);
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2 text-sm text-gray-400">
             <span>
-              {isExamMode 
+              {isExamMode
                 ? `Question ${currentCardIndex + 1} of ${examCards.length}`
-                : `Question ${currentFilteredIndex + 1} of ${filteredCards.length}`
-              }
+                : `Question ${currentFilteredIndex + 1} of ${
+                    filteredCards.length
+                  }`}
               {selectedRange && !isExamMode && (
                 <span className="ml-2 text-gray-500">
                   (Range: {selectedRange.start}-{selectedRange.end})
                 </span>
               )}
               {isExamMode && (
-                <span className="ml-2 text-gray-500">
-                  (Exam Mode)
-                </span>
+                <span className="ml-2 text-gray-500">(Exam Mode)</span>
               )}
             </span>
             {currentCard?.hasImage && (
