@@ -1,22 +1,37 @@
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/Button';
-import { HashIcon } from 'lucide-react';
+import { HashIcon, Shuffle } from 'lucide-react';
 
 interface QuestionRangeSelectorProps {
   totalQuestions: number;
-  onSelectRange: (start: number, end: number) => void;
+  onSelectRange: (start: number, end: number, randomOrder: boolean) => void;
   onClose: () => void;
 }
+
+const RANGE_PREFERENCES_KEY = "range-preferences-random";
 
 const QuestionRangeSelector: React.FC<QuestionRangeSelectorProps> = ({ 
   totalQuestions, 
   onSelectRange, 
   onClose 
 }) => {
+  const [isRandomOrder, setIsRandomOrder] = useState(() => {
+    try {
+      const saved = localStorage.getItem(RANGE_PREFERENCES_KEY);
+      return saved ? JSON.parse(saved) : false; // Changed default to false
+    } catch {
+      return false; // Changed default to false
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(RANGE_PREFERENCES_KEY, JSON.stringify(isRandomOrder));
+  }, [isRandomOrder]);
+
   const ranges = [];
   for (let i = 0; i < totalQuestions; i += 10) {
     const start = i + 1;
     const end = Math.min(i + 10, totalQuestions);
-    // Only add valid ranges
     if (start <= totalQuestions) {
       ranges.push({ start, end });
     }
@@ -27,22 +42,33 @@ const QuestionRangeSelector: React.FC<QuestionRangeSelectorProps> = ({
       <div className="bg-gray-800 rounded-lg max-w-4xl w-full h-[80vh] flex flex-col">
         <div className="p-4 border-b border-gray-700 flex justify-between items-center">
           <h2 className="text-xl font-bold">Select Question Range</h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-          >
-            Close
-          </Button>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className={isRandomOrder ? "bg-blue-500/20 border-blue-500" : ""}
+              onClick={() => setIsRandomOrder(!isRandomOrder)}
+            >
+              <Shuffle className="h-4 w-4 mr-2" />
+              Random Order
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+            >
+              Close
+            </Button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Button
+            <Button
               variant="outline"
               className="border-gray-700 hover:bg-gray-700/50 flex items-center justify-start gap-2 w-full"
               onClick={() => {
-                onSelectRange(1, totalQuestions);
+                onSelectRange(1, totalQuestions, isRandomOrder);
                 onClose();
               }}
             >
@@ -55,7 +81,7 @@ const QuestionRangeSelector: React.FC<QuestionRangeSelectorProps> = ({
                 variant="outline"
                 className="border-gray-700 hover:bg-gray-700/50 flex items-center justify-start gap-2 w-full"
                 onClick={() => {
-                  onSelectRange(start, end);
+                  onSelectRange(start, end, isRandomOrder);
                   onClose();
                 }}
               >
@@ -63,7 +89,6 @@ const QuestionRangeSelector: React.FC<QuestionRangeSelectorProps> = ({
                 <span className="truncate">Questions {start}-{end}</span>
               </Button>
             ))}
-           
           </div>
         </div>
       </div>

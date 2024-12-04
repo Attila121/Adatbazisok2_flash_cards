@@ -6,6 +6,9 @@ import MarkdownRenderer from "./MarkdownRenderer";
 import FlipCard from "./components/ui/Flippcard";
 import QuestionRangeSelector from "./components/QuestionRangeSelector";
 import MobileMenu from "./components/ui/MobileMenu";
+import ExamSetup from './components/ExamSetup';
+import ExamResults from './components/ExamResults';
+import { GraduationCap } from 'lucide-react';
 
 import {
   CheckCircle,
@@ -70,6 +73,12 @@ export default function FlashcardApp() {
   const [filteredCards, setFilteredCards] = useState<Flashcard[]>([]);
   const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showExamSetup, setShowExamSetup] = useState(false);
+const [showExamResults, setShowExamResults] = useState(false);
+const [isExamMode, setIsExamMode] = useState(false);
+const [examCards, setExamCards] = useState<Flashcard[]>([]);
+const [examCorrect, setExamCorrect] = useState(0);
+const [examIncorrect, setExamIncorrect] = useState(0);
 
   const loadProgress = (): Progress => {
     try {
@@ -321,8 +330,20 @@ export default function FlashcardApp() {
   }, []);
 
   const handleKnown = () => {
-    const currentCard = cards[currentCardIndex];
+    const currentCard = isExamMode ? examCards[currentCardIndex] : cards[currentCardIndex];
     if (!currentCard) return;
+    if (isExamMode) {
+      setExamCorrect(prev => prev + 1);
+      if (currentCardIndex < examCards.length - 1) {
+        setCurrentCardIndex(prev => prev + 1);
+        setShowAnswer(false);
+      } else {
+        // Show results
+        setShowExamResults(true);
+        setIsExamMode(false);
+      }
+    } else {
+
 
     const updatedCards = [...cards];
     updatedCards[currentCardIndex] = {
@@ -348,11 +369,24 @@ export default function FlashcardApp() {
       setCurrentCardIndex(nextIndex);
       saveProgress(updatedCards, nextIndex);
     }
+  }
   };
 
   const handleUnknown = () => {
-    const currentCard = cards[currentCardIndex];
+    const currentCard = isExamMode ? examCards[currentCardIndex] : cards[currentCardIndex];
     if (!currentCard) return;
+    if (isExamMode) {
+      setExamIncorrect(prev => prev + 1);
+      if (currentCardIndex < examCards.length - 1) {
+        setCurrentCardIndex(prev => prev + 1);
+        setShowAnswer(false);
+      } else {
+        // Show results
+        setShowExamResults(true);
+        setIsExamMode(false);
+      }
+    } else {
+
 
     const updatedCards = [...cards];
     updatedCards[currentCardIndex] = {
@@ -378,6 +412,7 @@ export default function FlashcardApp() {
       setCurrentCardIndex(nextIndex);
       saveProgress(updatedCards, nextIndex);
     }
+  }
   };
 
   const handleCardSelect = (index: number) => {
@@ -395,6 +430,24 @@ export default function FlashcardApp() {
     localStorage.removeItem(PROGRESS_KEY);
     localStorage.removeItem(LAST_POSITION_KEY);
     window.location.reload();
+  };
+
+  const handleStartExam = (questionCount: number, startRange: number, endRange: number) => {
+    // Filter cards within the range
+    const availableCards = cards.filter(
+      card => card.id >= startRange && card.id <= endRange
+    );
+    
+    // Randomly select cards from the filtered range
+    const shuffled = [...availableCards].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, questionCount);
+    
+    setExamCards(selected);
+    setExamCorrect(0);
+    setExamIncorrect(0);
+    setIsExamMode(true);
+    setCurrentCardIndex(0);
+    setShowAnswer(false);
   };
 
   // Update toggleStudyMode function to only handle unknown/all
@@ -441,15 +494,20 @@ export default function FlashcardApp() {
   }, [showQuestionList]);
 
   useEffect(() => {
-    const filtered = getFilteredCards();
-    setFilteredCards(filtered);
-    const newFilteredIndex = filtered.findIndex(
-      (card) => card.id === cards[currentCardIndex]?.id
-    );
-    setCurrentFilteredIndex(newFilteredIndex >= 0 ? newFilteredIndex : 0);
-  }, [cards, selectedRange, studyMode, currentCardIndex]);
+    if (!isExamMode) {
+        const filtered = getFilteredCards();
+        setFilteredCards(filtered);
+        const newFilteredIndex = filtered.findIndex(
+            (card) => card.id === cards[currentCardIndex]?.id
+        );
+        setCurrentFilteredIndex(newFilteredIndex >= 0 ? newFilteredIndex : 0);
+    } else {
+        setFilteredCards(examCards);
+        setCurrentFilteredIndex(currentCardIndex);
+    }
+  }, [cards, selectedRange, studyMode, currentCardIndex, isExamMode, examCards]);
 
-  const currentCard = cards[currentCardIndex];
+  const currentCard = isExamMode ? examCards[currentCardIndex] : cards[currentCardIndex];
 
   if (cards.length === 0) {
     return <div>Loading flashcards...</div>;
@@ -550,6 +608,14 @@ export default function FlashcardApp() {
             >
               <HashIcon className="h-4 w-4" />
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-gray-700 hover:bg-gray-800"
+              onClick={() => setShowExamSetup(true)}
+            >
+              <GraduationCap className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
@@ -570,21 +636,30 @@ export default function FlashcardApp() {
         {/* Add Range Selector */}
         {showRangeSelector && (
           <QuestionRangeSelector
-            totalQuestions={cards.length}
-            onSelectRange={(start, end) => {
-              setSelectedRange({ start, end });
-              // Find the first card in the new range and set it as current
-              const firstCardInRange = cards.find((card) => card.id === start);
-              if (firstCardInRange) {
-                const startIndex = cards.findIndex(
-                  (card) => card.id === firstCardInRange.id
-                );
-                setCurrentCardIndex(startIndex);
-              }
-              setShowAnswer(false);
-            }}
-            onClose={() => setShowRangeSelector(false)}
-          />
+          totalQuestions={cards.length}
+          onSelectRange={(start, end, randomOrder) => {
+            setSelectedRange({ start, end });
+            // Find cards in the range
+            const cardsInRange = cards.filter(
+              (card) => card.id >= start && card.id <= end
+            );
+            
+            // Apply random order if selected
+            const orderedCards = randomOrder 
+              ? [...cardsInRange].sort(() => Math.random() - 0.5)
+              : cardsInRange;
+            
+            // Find the first card in the new range and set it as current
+            if (orderedCards.length > 0) {
+              const startIndex = cards.findIndex(
+                (card) => orderedCards[0] && card.id === orderedCards[0].id
+              );
+              setCurrentCardIndex(startIndex);
+            }
+            setShowAnswer(false);
+          }}
+          onClose={() => setShowRangeSelector(false)}
+        />
         )}
 
         {showQuestionList && (
@@ -633,10 +708,18 @@ export default function FlashcardApp() {
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2 text-sm text-gray-400">
             <span>
-              Question {currentFilteredIndex + 1} of {filteredCards.length}
-              {selectedRange && (
+              {isExamMode 
+                ? `Question ${currentCardIndex + 1} of ${examCards.length}`
+                : `Question ${currentFilteredIndex + 1} of ${filteredCards.length}`
+              }
+              {selectedRange && !isExamMode && (
                 <span className="ml-2 text-gray-500">
                   (Range: {selectedRange.start}-{selectedRange.end})
+                </span>
+              )}
+              {isExamMode && (
+                <span className="ml-2 text-gray-500">
+                  (Exam Mode)
                 </span>
               )}
             </span>
@@ -751,6 +834,29 @@ export default function FlashcardApp() {
           )}
         </div>
       </div>
+      {showExamSetup && (
+        <ExamSetup
+          totalQuestions={cards.length}
+          onStartExam={handleStartExam}
+          onClose={() => setShowExamSetup(false)}
+        />
+      )}
+
+      {showExamResults && (
+        <ExamResults
+          correct={examCorrect}
+          incorrect={examIncorrect}
+          onRetry={() => {
+            setShowExamResults(false);
+            setShowExamSetup(true);
+          }}
+          onClose={() => {
+            setShowExamResults(false);
+            setIsExamMode(false);
+            setCurrentCardIndex(0);
+          }}
+        />
+      )}
     </div>
   );
 }
