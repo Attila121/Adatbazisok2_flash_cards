@@ -1,6 +1,7 @@
 # Adatbázisok 2 Tanulókártya Alkalmazás
 Modern, interaktív tanulókártya alkalmazás az Adatbázisok 2 vizsgakérdések gyakorlásához.Felhasználva az https://github.com/BeanieBarrow/adatb2_kerdesek adatbázisok vizsgakérdéseire vonatkozó megoldásokat.
 Az alkalmazás React és TypeScript alapokon nyugszik, sötét témával és markdown támogatással.
+
 ### Telepítés nélkül github PWA
 
 Elérhető https://attila121.github.io/Adatbazisok2_flash_cards/
@@ -32,6 +33,11 @@ Az alkalmazás ezután elérhető a következő címen: `http://localhost:5173`
   - Összes kérdés gyakorlása
   - Csak ismeretlen kérdések gyakorlása
   - Megjelölt kérdések gyakorlása
+  - Vizsga mód: Kiválasztott számú kérdés véletlenszerű sorrendben
+- **Testreszabható gyakorlás**:
+  - Kérdések tartományának kiválasztása
+  - Véletlenszerű vagy sorrendben haladó kérdések
+  - Vizsga mód beállítható kérdésszámmal és tartománnyal
 
 ### Haladáskövetés
 - **Részletes statisztikák**:
@@ -39,22 +45,31 @@ Az alkalmazás ezután elérhető a következő címen: `http://localhost:5173`
   - Helyes/helytelen válaszok követése kártyánként
   - Utolsó gyakorlás időpontja
   - Megjelölt kártyák száma
+  - Vizsga eredmények azonnali kiértékelése
 - **Folyamatos mentés**:
   - Automatikus haladásmentés
   - Utolsó pozíció megjegyzése
   - Megjelölt kártyák perzisztens tárolása
+  - Vizsga és tartomány beállítások megjegyzése
+
+### Navigáció és szűrés
+- **Kérdéslista**: Gyors navigáció a kérdések között
+- **Tartományválasztó**: 
+  - Specifikus kérdéscsoportok gyakorlása
+  - Beállítható véletlenszerű sorrend
+  - Utolsó beállítások megjegyzése
+- **Vizsga mód**:
+  - Testreszabható kérdésszám
+  - Választható kérdéstartomány
+  - Részletes eredményértékelés
+- **Kérdések megjelölése**: Fontos vagy ismétlést igénylő kérdések kiemelése
+- **Haladásjelző**: Vizuális visszajelzés a gyakorlás előrehaladásáról
 
 ### Tartalom megjelenítés
 - Markdown formázás támogatása
 - Kódrészletek szintaxis kiemelése
 - Képek és diagramok beágyazása
 - Táblázatok és listák formázott megjelenítése
-
-### Navigáció és szűrés
-- **Kérdéslista**: Gyors navigáció a kérdések között
-- **Tartományválasztó**: Specifikus kérdéscsoportok gyakorlása
-- **Kérdések megjelölése**: Fontos vagy ismétlést igénylő kérdések kiemelése
-- **Haladásjelző**: Vizuális visszajelzés a gyakorlás előrehaladásáról
 
 ### Felhasználói felület
 - Reszponzív dizájn: Működik asztali és mobil eszközökön
@@ -76,8 +91,6 @@ Az alkalmazás ezután elérhető a következő címen: `http://localhost:5173`
 ### Követelmények
 - Node.js >= 16.0.0
 - npm >= 7.0.0
-
-
 
 ## Kérdések szerkesztése
 
@@ -101,4 +114,4 @@ Válasz szövege
 - A képek automatikusan megjelennek a válaszokban
 
 
-Készítette: Attila121 - 2024
+Készítette: Mielec Attila - 2024
