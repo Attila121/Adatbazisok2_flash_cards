@@ -15,17 +15,25 @@ const QuestionRangeSelector: React.FC<QuestionRangeSelectorProps> = ({
   onSelectRange, 
   onClose 
 }) => {
+  useEffect(() => {
+    const savedRange = localStorage.getItem(RANGE_PREFERENCES_KEY);
+    if (savedRange) {
+      const { start, end, randomOrder } = JSON.parse(savedRange);
+      onSelectRange(start, end, randomOrder);
+    }
+  }, [onSelectRange]);
+
   const [isRandomOrder, setIsRandomOrder] = useState(() => {
     try {
       const saved = localStorage.getItem(RANGE_PREFERENCES_KEY);
-      return saved ? JSON.parse(saved) : false; // Changed default to false
+      return saved ? JSON.parse(saved).randomOrder : false; 
     } catch {
-      return false; // Changed default to false
+      return false; 
     }
   });
 
   useEffect(() => {
-    localStorage.setItem(RANGE_PREFERENCES_KEY, JSON.stringify(isRandomOrder));
+    localStorage.setItem(RANGE_PREFERENCES_KEY, JSON.stringify({ randomOrder: isRandomOrder }));
   }, [isRandomOrder]);
 
   const ranges = [];
@@ -69,6 +77,7 @@ const QuestionRangeSelector: React.FC<QuestionRangeSelectorProps> = ({
               className="border-gray-700 hover:bg-gray-700/50 flex items-center justify-start gap-2 w-full"
               onClick={() => {
                 onSelectRange(1, totalQuestions, isRandomOrder);
+                localStorage.setItem(RANGE_PREFERENCES_KEY, JSON.stringify({ start: 1, end: totalQuestions, randomOrder: isRandomOrder }));
                 onClose();
               }}
             >
@@ -82,6 +91,7 @@ const QuestionRangeSelector: React.FC<QuestionRangeSelectorProps> = ({
                 className="border-gray-700 hover:bg-gray-700/50 flex items-center justify-start gap-2 w-full"
                 onClick={() => {
                   onSelectRange(start, end, isRandomOrder);
+                  localStorage.setItem(RANGE_PREFERENCES_KEY, JSON.stringify({ start, end, randomOrder: isRandomOrder }));
                   onClose();
                 }}
               >

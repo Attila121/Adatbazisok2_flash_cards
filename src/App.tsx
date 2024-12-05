@@ -34,7 +34,7 @@ type Flashcard = {
   timesCorrect: number;
   timesIncorrect: number;
   lastReviewed?: Date;
-  isMarked?: boolean; // New property
+  isMarked?: boolean;
 };
 
 type Progress = {
@@ -118,19 +118,19 @@ export default function FlashcardApp() {
 
   const getFilteredCards = () => {
     let filteredCards = [...cards];
-  
+
     // First apply range filter if selected
     if (selectedRange) {
       filteredCards = filteredCards.filter(
         (card) => card.id >= selectedRange.start && card.id <= selectedRange.end
       );
-  
+
       // If in random order mode, use the randomized array
       if (isRandomOrder && randomOrderCards.length > 0) {
         return randomOrderCards;
       }
     }
-  
+
     // Then apply study mode filter
     switch (studyMode) {
       case "marked":
@@ -356,27 +356,28 @@ export default function FlashcardApp() {
     } else {
       const currentCard = cards[currentCardIndex];
       if (!currentCard) return;
-  
+
       const updatedCards = [...cards];
       updatedCards[currentCardIndex] = {
         ...currentCard,
         timesCorrect: currentCard.timesCorrect + 1,
         lastReviewed: new Date(),
       };
-  
+
       setCards(updatedCards);
       setKnownCards([...knownCards, currentCard]);
       setShowAnswer(false);
-  
+
       const nextFilteredIndex =
         currentFilteredIndex < filteredCards.length - 1
           ? currentFilteredIndex + 1
           : 0;
-  
+
       // If we're at the end and using random order, reshuffle
       if (nextFilteredIndex === 0 && isRandomOrder && selectedRange) {
         const cardsInRange = cards.filter(
-          (card) => card.id >= selectedRange.start && card.id <= selectedRange.end
+          (card) =>
+            card.id >= selectedRange.start && card.id <= selectedRange.end
         );
         const newShuffled = [...cardsInRange].sort(() => Math.random() - 0.5);
         setRandomOrderCards(newShuffled);
@@ -391,7 +392,7 @@ export default function FlashcardApp() {
           setCurrentCardIndex(nextIndex);
         }
       }
-      
+
       saveProgress(updatedCards, currentCardIndex);
     }
   };
@@ -414,27 +415,28 @@ export default function FlashcardApp() {
     } else {
       const currentCard = cards[currentCardIndex];
       if (!currentCard) return;
-   
+
       const updatedCards = [...cards];
       updatedCards[currentCardIndex] = {
         ...currentCard,
         timesIncorrect: currentCard.timesIncorrect + 1,
         lastReviewed: new Date(),
       };
-   
+
       setCards(updatedCards);
       setUnknownCards([...unknownCards, currentCard]);
       setShowAnswer(false);
-   
+
       const nextFilteredIndex =
         currentFilteredIndex < filteredCards.length - 1
           ? currentFilteredIndex + 1
           : 0;
-   
+
       // If at end and using random order, reshuffle
       if (nextFilteredIndex === 0 && isRandomOrder && selectedRange) {
         const cardsInRange = cards.filter(
-          (card) => card.id >= selectedRange.start && card.id <= selectedRange.end
+          (card) =>
+            card.id >= selectedRange.start && card.id <= selectedRange.end
         );
         const newShuffled = [...cardsInRange].sort(() => Math.random() - 0.5);
         setRandomOrderCards(newShuffled);
@@ -449,10 +451,10 @@ export default function FlashcardApp() {
           setCurrentCardIndex(nextIndex);
         }
       }
-      
+
       saveProgress(updatedCards, currentCardIndex);
     }
-   };
+  };
 
   const handleCardSelect = (index: number) => {
     const selectedCard = filteredCards[index];
@@ -476,12 +478,10 @@ export default function FlashcardApp() {
     startRange: number,
     endRange: number
   ) => {
-    // Filter cards within the range
+    setSelectedRange({ start: startRange, end: endRange });
     const availableCards = cards.filter(
       (card) => card.id >= startRange && card.id <= endRange
     );
-
-    // Randomly select cards from the filtered range
     const shuffled = [...availableCards].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, questionCount);
 
@@ -490,6 +490,44 @@ export default function FlashcardApp() {
     setExamIncorrect(0);
     setIsExamMode(true);
     setCurrentCardIndex(0);
+    setShowAnswer(false);
+    setFilteredCards(selected);
+  };
+
+  const handleExamClose = () => {
+    setShowExamResults(false);
+    setIsExamMode(false);
+    setExamCards([]);
+
+    // Restore range mode
+    if (selectedRange) {
+      const cardsInRange = cards.filter(
+        (card) => card.id >= selectedRange.start && card.id <= selectedRange.end
+      );
+      setFilteredCards(cardsInRange);
+      const startIndex =
+        cards.findIndex((card) => card.id === cardsInRange[0]?.id) || 0;
+      setCurrentCardIndex(startIndex);
+    }
+    setShowAnswer(false);
+  };
+
+  const handleQuitExam = () => {
+    setIsExamMode(false);
+    setExamCards([]);
+    setExamCorrect(0);
+    setExamIncorrect(0);
+
+    // Restore previous range if it exists
+    if (selectedRange) {
+      const cardsInRange = cards.filter(
+        (card) => card.id >= selectedRange.start && card.id <= selectedRange.end
+      );
+      setFilteredCards(cardsInRange);
+      const startIndex =
+        cards.findIndex((card) => card.id === cardsInRange[0]?.id) || 0;
+      setCurrentCardIndex(startIndex);
+    }
     setShowAnswer(false);
   };
 
@@ -568,20 +606,40 @@ export default function FlashcardApp() {
   // Add UI elements to render
   const renderCardControls = () => (
     <div className="grid grid-cols-3 gap-4 mb-6">
-      <Button onClick={handleUnknown} variant="destructive">
-        <XCircle className="mr-2" /> Don't Know
-      </Button>
-      <Button
-        onClick={() => toggleMark(currentCardIndex)}
-        variant="outline"
-        className={currentCard?.isMarked ? "border-yellow-500" : ""}
-      >
-        {currentCard?.isMarked ? <BookmarkCheck /> : <Bookmark />}
-        {currentCard?.isMarked ? "Marked" : "Mark"}
-      </Button>
-      <Button onClick={handleKnown}>
-        <CheckCircle className="mr-2" /> Know It
-      </Button>
+      {!isExamMode ? (
+        <>
+          <Button onClick={handleUnknown} variant="destructive">
+            <XCircle className="mr-2" /> Don't Know
+          </Button>
+          <Button
+            onClick={() => toggleMark(currentCardIndex)}
+            variant="outline"
+            className={currentCard?.isMarked ? "border-yellow-500" : ""}
+          >
+            {currentCard?.isMarked ? <BookmarkCheck /> : <Bookmark />}
+            {currentCard?.isMarked ? "Marked" : "Mark"}
+          </Button>
+          <Button onClick={handleKnown}>
+            <CheckCircle className="mr-2" /> Know It
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button onClick={handleUnknown} variant="destructive">
+            <XCircle className="mr-2" /> Don't Know
+          </Button>
+          <Button
+            variant="outline"
+            className="text-red-400 border-red-400/50 hover:bg-red-400/10"
+            onClick={handleQuitExam}
+          >
+            Quit Exam
+          </Button>
+          <Button onClick={handleKnown}>
+            <CheckCircle className="mr-2" /> Know It
+          </Button>
+        </>
+      )}
     </div>
   );
 
@@ -593,84 +651,96 @@ export default function FlashcardApp() {
           <h1 className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
             Adatbázisok 2 vizsga kérdések
           </h1>
-
-          {/* Mobile menu button */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="sm:hidden border-gray-700 hover:bg-gray-800"
-            onClick={() => setIsMobileMenuOpen(true)}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-
+          {/* Mobile Menu Button - hide during exam */}
+          {!isExamMode && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="sm:hidden border-gray-700 hover:bg-gray-800"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
           {/* Desktop controls */}
-          <div className="hidden sm:flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-gray-700 hover:bg-gray-800"
-              onClick={() => setShowQuestionList(!showQuestionList)}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-gray-700 hover:bg-gray-800"
-              onClick={() => setDualView(!dualView)}
-            >
-              {dualView ? (
-                <Maximize2 className="h-4 w-4" />
-              ) : (
-                <Columns className="h-4 w-4" />
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-gray-700 hover:bg-gray-800"
-              onClick={toggleStudyMode}
-            >
-              {studyMode === "all" ? "Study Unknown Only" : "Study All"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className={`border-gray-700 hover:bg-gray-800 ${
-                studyMode === "marked" ? "bg-yellow-500/20 text-yellow-500" : ""
-              }`}
-              onClick={toggleMarkedMode}
-            >
-              <BookmarkCheck className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-gray-700 hover:bg-gray-800"
-              onClick={handleReset}
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-gray-700 hover:bg-gray-800"
-              onClick={() => setShowRangeSelector(true)}
-            >
-              <HashIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-gray-700 hover:bg-gray-800"
-              onClick={() => setShowExamSetup(true)}
-            >
-              <GraduationCap className="h-4 w-4" />
-            </Button>
-          </div>
+          {!isExamMode ? (
+            <div className="hidden sm:flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-gray-700 hover:bg-gray-800"
+                onClick={() => setShowQuestionList(!showQuestionList)}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-gray-700 hover:bg-gray-800"
+                onClick={() => setDualView(!dualView)}
+              >
+                {dualView ? (
+                  <Maximize2 className="h-4 w-4" />
+                ) : (
+                  <Columns className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-gray-700 hover:bg-gray-800"
+                onClick={toggleStudyMode}
+              >
+                {studyMode === "all" ? "Study Unknown Only" : "Study All"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`border-gray-700 hover:bg-gray-800 ${
+                  studyMode === "marked" ? "bg-yellow-500/20 text-yellow-500" : ""
+                }`}
+                onClick={toggleMarkedMode}
+              >
+                <BookmarkCheck className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-gray-700 hover:bg-gray-800"
+                onClick={handleReset}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-gray-700 hover:bg-gray-800"
+                onClick={() => setShowRangeSelector(true)}
+              >
+                <HashIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-gray-700 hover:bg-gray-800"
+                onClick={() => setShowExamSetup(true)}
+              >
+                <GraduationCap className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="hidden sm:flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-400 border-red-400/50 hover:bg-red-400/10"
+                onClick={handleQuitExam}
+              >
+                Quit Exam
+              </Button>
+            </div>
+          )}
         </div>
-
         {/* Mobile Menu */}
         <MobileMenu
           studyMode={studyMode}
@@ -687,39 +757,40 @@ export default function FlashcardApp() {
 
         {/* Add Range Selector */}
         {showRangeSelector && (
-         <QuestionRangeSelector
-         totalQuestions={cards.length}
-         onSelectRange={(start, end, randomOrder) => {
-           setSelectedRange({ start, end });
-           setIsRandomOrder(randomOrder);
-           
-           // Find cards in the range
-           const cardsInRange = cards.filter(
-             (card) => card.id >= start && card.id <= end
-           );
-           
-           // If random order, create a shuffled array
-           if (randomOrder) {
-             const shuffled = [...cardsInRange].sort(() => Math.random() - 0.5);
-             setRandomOrderCards(shuffled);
-             // Start from the beginning of the shuffled array
-             const startIndex = cards.findIndex(
-               (card) => shuffled[0] && card.id === shuffled[0].id
-             );
-             setCurrentCardIndex(startIndex);
-           } else {
-             setRandomOrderCards([]);
-             // Start from the first card in sequential order
-             const startIndex = cards.findIndex(
-               (card) => cardsInRange[0] && card.id === cardsInRange[0].id
-             );
-             setCurrentCardIndex(startIndex);
-           }
-           setShowAnswer(false);
-         }}
-         onClose={() => setShowRangeSelector(false)}
-       />
-       
+          <QuestionRangeSelector
+            totalQuestions={cards.length}
+            onSelectRange={(start, end, randomOrder) => {
+              setSelectedRange({ start, end });
+              setIsRandomOrder(randomOrder);
+
+              // Find cards in the range
+              const cardsInRange = cards.filter(
+                (card) => card.id >= start && card.id <= end
+              );
+
+              // If random order, create a shuffled array
+              if (randomOrder) {
+                const shuffled = [...cardsInRange].sort(
+                  () => Math.random() - 0.5
+                );
+                setRandomOrderCards(shuffled);
+                // Start from the beginning of the shuffled array
+                const startIndex = cards.findIndex(
+                  (card) => shuffled[0] && card.id === shuffled[0].id
+                );
+                setCurrentCardIndex(startIndex);
+              } else {
+                setRandomOrderCards([]);
+                // Start from the first card in sequential order
+                const startIndex = cards.findIndex(
+                  (card) => cardsInRange[0] && card.id === cardsInRange[0].id
+                );
+                setCurrentCardIndex(startIndex);
+              }
+              setShowAnswer(false);
+            }}
+            onClose={() => setShowRangeSelector(false)}
+          />
         )}
 
         {showQuestionList && (
@@ -909,11 +980,7 @@ export default function FlashcardApp() {
             setShowExamResults(false);
             setShowExamSetup(true);
           }}
-          onClose={() => {
-            setShowExamResults(false);
-            setIsExamMode(false);
-            setCurrentCardIndex(0);
-          }}
+          onClose={handleExamClose}
         />
       )}
     </div>
