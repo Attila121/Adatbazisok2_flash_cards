@@ -697,7 +697,9 @@ export default function FlashcardApp() {
                 variant="outline"
                 size="sm"
                 className={`border-gray-700 hover:bg-gray-800 ${
-                  studyMode === "marked" ? "bg-yellow-500/20 text-yellow-500" : ""
+                  studyMode === "marked"
+                    ? "bg-yellow-500/20 text-yellow-500"
+                    : ""
                 }`}
                 onClick={toggleMarkedMode}
               >
